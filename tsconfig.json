@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    // Ambiente
+    "lib": ["ESNext"],
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    "types": ["bun"],
+
+    // Bun executa o TS direto: nada é emitido, imports mantêm a extensão .ts
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+
+    // Rigor
+    "strict": true,
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["index.ts", "src/**/*.ts"]
+}

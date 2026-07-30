@@ -1,0 +1,17 @@
+{
+  "name": "download-replay",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Baixa replays do ReplayBR e junta as duas câmeras lado a lado em um vídeo só",
+  "bin": {
+    "download-replay": "./index.ts"
+  },
+  "scripts": {
+    "start": "bun run index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "typescript": "^7.0.2"
+  }
+}
