@@ -1,11 +1,12 @@
 const API_BASE = "https://replays.replaybr.com.br";
 
-/** Um lance gravado, com as duas câmeras do mesmo instante. */
+/** Um lance gravado. Nem todo campo (nem todo lance) tem a segunda câmera. */
 export interface Replay {
   /** ISO local sem timezone, ex: "2026-07-29T20:02:49" */
   timestamp: string;
   camera1_url: string;
-  camera2_url: string;
+  /** Ausente quando o lance foi gravado por uma câmera só. */
+  camera2_url?: string;
 }
 
 export interface SlotGrouping {

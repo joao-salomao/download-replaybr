@@ -6,10 +6,14 @@ export interface Dimensions {
   height: number;
 }
 
-export interface StackOptions extends Dimensions {
-  camera1: string;
-  camera2: string;
+export interface RenderClipOptions {
+  /** Uma ou duas câmeras do mesmo lance. */
+  sources: string[];
   output: string;
+  /** Tamanho de cada câmera dentro do quadro. */
+  cell: Dimensions;
+  /** Colunas do quadro final: 2 quando o horário tem alguma segunda câmera. */
+  columns: number;
   fps: number;
   crf: number;
   preset: string;
@@ -59,31 +63,47 @@ export async function probeDimensions(file: string): Promise<Dimensions> {
 }
 
 /**
- * Junta duas câmeras lado a lado em um clipe. Ambas são escaladas para o mesmo
- * tamanho (com padding, preservando o aspecto) para que o hstack nunca falhe e
- * para que todos os clipes fiquem idênticos — pré-requisito do concat sem recodificar.
+ * Renderiza um lance. Com duas câmeras, elas vão lado a lado; com uma só, ela
+ * fica centralizada no quadro (que continua com `columns` colunas).
+ *
+ * Cada câmera é escalada para o mesmo tamanho preservando o aspecto, e todos os
+ * clipes de um horário saem com dimensões idênticas — pré-requisito do concat
+ * sem recodificar.
  */
-export async function stackPair({
-  camera1,
-  camera2,
+export async function renderClip({
+  sources,
   output,
-  width,
-  height,
+  cell,
+  columns,
   fps,
   crf,
   preset,
-}: StackOptions): Promise<string> {
-  const normalize = (label: string): string =>
-    `scale=${width}:${height}:force_original_aspect_ratio=decrease,` +
-    `pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[${label}]`;
+}: RenderClipOptions): Promise<string> {
+  if (sources.length === 0) {
+    throw new Error(`Nenhuma câmera para renderizar em ${output}`);
+  }
+
+  const frameWidth = cell.width * columns;
+  const steps = sources.map(
+    (_, i) =>
+      `[${i}:v]scale=${cell.width}:${cell.height}:force_original_aspect_ratio=decrease,` +
+      `pad=${cell.width}:${cell.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${fps}[c${i}]`,
+  );
+
+  if (sources.length >= 2) {
+    steps.push(`[c0][c1]hstack=inputs=2[v]`);
+  } else if (frameWidth !== cell.width) {
+    // Câmera única num quadro de duas colunas: centraliza e preenche o resto.
+    steps.push(`[c0]pad=${frameWidth}:${cell.height}:(ow-iw)/2:0[v]`);
+  } else {
+    steps.push(`[c0]null[v]`);
+  }
 
   await mkdir(dirname(output), { recursive: true });
   await run("ffmpeg", [
     "-y", "-loglevel", "error",
-    "-i", camera1,
-    "-i", camera2,
-    "-filter_complex",
-    `[0:v]${normalize("l")};[1:v]${normalize("r")};[l][r]hstack=inputs=2[v]`,
+    ...sources.flatMap((source) => ["-i", source]),
+    "-filter_complex", steps.join(";"),
     "-map", "[v]",
     "-an",
     "-c:v", "libx264",

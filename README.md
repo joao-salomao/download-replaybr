@@ -2,6 +2,8 @@
 
 CLI em [Bun](https://bun.sh) + TypeScript que baixa os replays do [ReplayBR](https://www.replaybr.com.br/replay?fieldName=placar-society) de uma data e horário e gera **um vídeo por lance**, com as **duas câmeras lado a lado** tocando ao mesmo tempo.
 
+Campos com uma câmera só também funcionam — veja [Câmera única](#câmera-única).
+
 ## Requisitos
 
 - `bun`
@@ -64,7 +66,18 @@ O horário aceita `20:30`, `2030` ou `20h30`.
 
 2. **`src/download.ts`** — baixa `camera1.mp4` e `camera2.mp4` de cada replay (~7 MB cada, 30s, 704x560, sem áudio), com paralelismo limitado. Arquivos já baixados são reaproveitados.
 
-3. **`src/ffmpeg.ts`** — para cada replay, normaliza as duas câmeras para o mesmo tamanho e faz `hstack` (1408x560), gerando um arquivo por lance. Com `--concat`, junta os clipes com o concat demuxer sem recodificar — o que só funciona porque todos foram codificados com parâmetros idênticos.
+3. **`src/ffmpeg.ts`** — para cada replay, normaliza as câmeras para o mesmo tamanho e faz `hstack` (1408x560), gerando um arquivo por lance. Com `--concat`, junta os clipes com o concat demuxer sem recodificar — o que só funciona porque todos foram codificados com parâmetros idênticos.
+
+### Câmera única
+
+`camera2_url` é opcional **por lance**, não por campo: `four-play-1` não tem nenhuma segunda câmera, e `four-play-2` tem em apenas 7 dos 44 lances de um dia. A regra é decidida por horário:
+
+- Se **nenhum** lance do horário tem segunda câmera → os clipes saem em largura simples (704x560).
+- Se **algum** tem → o quadro é duplo (1408x560) e os lances de câmera única ficam centralizados, com barras nas laterais.
+
+Assim todos os clipes de um horário mantêm as mesmas dimensões, e o `--concat` sem recodificar continua válido.
+
+A duração também varia por campo: `placar-society` grava ~30s por lance, enquanto `four-play-1` grava ~3s. O resumo ao final mede a duração real em vez de assumir.
 
 ### Estrutura de saída (gerada)
 

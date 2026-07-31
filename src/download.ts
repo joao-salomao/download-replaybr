@@ -23,12 +23,12 @@ export interface DownloadProgress extends DownloadResult {
   job: DownloadJob;
 }
 
-/** Um replay com os dois arquivos locais já baixados. */
+/** Um replay com seus arquivos locais já baixados. */
 export interface ReplayPair {
   index: number;
   timestamp: string;
-  camera1: string;
-  camera2: string;
+  /** Uma ou duas câmeras, na ordem. */
+  cameras: string[];
 }
 
 export interface DownloadOptions {
@@ -97,22 +97,17 @@ export async function downloadReplayPairs(
 ): Promise<ReplayPair[]> {
   const jobs: DownloadJob[] = replays.flatMap((replay, index) => {
     const prefix = prefixFor(index);
-    return [
-      {
-        index,
-        replay,
-        camera: 1,
-        url: replay.camera1_url,
-        path: `${rawDir}/${prefix}_camera1.mp4`,
-      },
-      {
-        index,
-        replay,
-        camera: 2,
-        url: replay.camera2_url,
-        path: `${rawDir}/${prefix}_camera2.mp4`,
-      },
-    ];
+    const urls: Array<[1 | 2, string]> = [[1, replay.camera1_url]];
+    // A segunda câmera é opcional e varia por lance, não só por campo.
+    if (replay.camera2_url) urls.push([2, replay.camera2_url]);
+
+    return urls.map(([camera, url]) => ({
+      index,
+      replay,
+      camera,
+      url,
+      path: `${rawDir}/${prefix}_camera${camera}.mp4`,
+    }));
   });
 
   let done = 0;
@@ -125,11 +120,9 @@ export async function downloadReplayPairs(
 
   return replays.map((replay, index) => {
     const prefix = prefixFor(index);
-    return {
-      index,
-      timestamp: replay.timestamp,
-      camera1: `${rawDir}/${prefix}_camera1.mp4`,
-      camera2: `${rawDir}/${prefix}_camera2.mp4`,
-    };
+    const cameras = [`${rawDir}/${prefix}_camera1.mp4`];
+    if (replay.camera2_url) cameras.push(`${rawDir}/${prefix}_camera2.mp4`);
+
+    return { index, timestamp: replay.timestamp, cameras };
   });
 }

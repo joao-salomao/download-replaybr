@@ -7,7 +7,7 @@ import {
   concatClips,
   probeDimensions,
   probeDuration,
-  stackPair,
+  renderClip,
 } from "./src/ffmpeg.ts";
 
 const DEFAULTS = {
@@ -172,9 +172,21 @@ async function main(): Promise<void> {
   const rawDir = `${slotDir}/raw`;
   const outSlotDir = `${args.outDir}/${args.field}/${args.date}/${slotLabel}`;
 
+  // A segunda câmera varia por lance. Se algum lance do horário tiver duas, o
+  // quadro é duplo e os de câmera única ficam centralizados — assim todos os
+  // clipes saem com o mesmo tamanho e o concat sem recodificar continua válido.
+  const withTwoCameras = selected.filter((replay) => replay.camera2_url).length;
+  const columns = withTwoCameras > 0 ? 2 : 1;
+  const fileCount = selected.length + withTwoCameras;
+
   console.log(
-    `\n→ ${selected.length} replay(s) no horário ${time}. Baixando ${selected.length * 2} arquivos...`,
+    `\n→ ${selected.length} replay(s) no horário ${time}. Baixando ${fileCount} arquivos...`,
   );
+  if (withTwoCameras < selected.length) {
+    const singles = selected.length - withTwoCameras;
+    console.log(`  ${singles} lance(s) com uma câmera só.`);
+  }
+
   const pairs = await downloadReplayPairs(selected, rawDir, {
     concurrency: args.concurrency,
     onProgress: ({ done, total, job, skipped, bytes }) => {
@@ -184,39 +196,54 @@ async function main(): Promise<void> {
     },
   });
 
-  const first = pairs[0];
-  if (!first) fail("Nenhum par de câmeras foi baixado.");
+  const first = pairs[0]?.cameras[0];
+  if (!first) fail("Nenhum vídeo foi baixado.");
 
-  const { width, height } = await probeDimensions(first.camera1);
+  const cell = await probeDimensions(first);
+  const frameWidth = cell.width * columns;
   console.log(
-    `\n→ Juntando lado a lado (${width}x${height} → ${width * 2}x${height})...`,
+    columns === 2
+      ? `\n→ Juntando lado a lado (${cell.width}x${cell.height} → ${frameWidth}x${cell.height})...`
+      : `\n→ Renderizando câmera única (${frameWidth}x${cell.height})...`,
   );
 
   const clips: string[] = [];
+  const durations: number[] = [];
   for (const pair of pairs) {
     // Um arquivo por lance, nomeado pelo horário em que ele aconteceu.
     const index = String(pair.index + 1).padStart(2, "0");
     const clock = pair.timestamp.slice(11).replaceAll(":", "-");
     const output = `${outSlotDir}/${index}_${clock}.mp4`;
 
-    await stackPair({
-      camera1: pair.camera1,
-      camera2: pair.camera2,
+    await renderClip({
+      sources: pair.cameras,
       output,
-      width,
-      height,
+      cell,
+      columns,
       fps: args.fps,
       crf: args.crf,
       preset: args.preset,
     });
     clips.push(output);
+    durations.push(await probeDuration(output));
+
+    const tag = pair.cameras.length === 1 ? "  (1 câmera)" : "";
     console.log(
-      `  [${String(clips.length).padStart(2)}/${pairs.length}] ${output}`,
+      `  [${String(clips.length).padStart(2)}/${pairs.length}] ${output}${tag}`,
     );
   }
 
+  // A duração varia bastante entre campos (de ~3s a ~30s), então é medida.
+  const shortest = Math.min(...durations);
+  const longest = Math.max(...durations);
+  const each =
+    longest - shortest < 1
+      ? `${longest.toFixed(1)}s cada`
+      : `${shortest.toFixed(1)}–${longest.toFixed(1)}s cada`;
+  const layout = columns === 2 ? "câmera 1 | câmera 2" : "câmera 1";
+
   console.log(`\n✓ ${clips.length} vídeo(s) em ${outSlotDir}/`);
-  console.log(`  ${width * 2}x${height} · ~30s cada · câmera 1 | câmera 2`);
+  console.log(`  ${frameWidth}x${cell.height} · ${each} · ${layout}`);
 
   if (args.concat) {
     const finalPath = `${outSlotDir}/completo.mp4`;
