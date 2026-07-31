@@ -90,9 +90,31 @@ downloads/<campo>/<data>/<HH-MM>/
   raw/  01_camera1.mp4, 01_camera2.mp4, …   ← brutos, permitem reprocessar sem baixar de novo
 ```
 
+## Binário único
+
+Gera um executável standalone em `dist/download-replay`, com o runtime do Bun embutido:
+
+```bash
+bun run build
+```
+
+O binário roda sem Bun instalado e de qualquer diretório (os caminhos de saída são relativos ao diretório atual):
+
+```bash
+./dist/download-replay 2026-07-29 20:30
+```
+
+Por incluir o runtime, o binário é grande (~58 MB no macOS arm64, ~100 MB no alvo Linux). E **`ffmpeg` e `ffprobe` continuam sendo dependências externas** — não são embutidos.
+
+Para gerar para outra plataforma, acrescente `--target`:
+
+```bash
+bun build ./index.ts --compile --minify --target=bun-linux-x64 --outfile dist/download-replay-linux
+```
+
 ## Desenvolvimento
 
-O projeto é TypeScript puro. Bun executa os `.ts` diretamente, então **não há build step** — `tsc` é usado só para checagem de tipos e para o suporte no editor.
+O projeto é TypeScript puro. Bun executa os `.ts` diretamente, então **não há build step** para rodar — `tsc` é usado só para checagem de tipos e para o suporte no editor.
 
 ```bash
 bun run typecheck
