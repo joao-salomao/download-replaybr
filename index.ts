@@ -24,6 +24,7 @@ interface CliArgs {
   help: boolean;
   list: boolean;
   concat: boolean;
+  swap: boolean;
   date: string | undefined;
   time: string | undefined;
   field: string;
@@ -52,6 +53,7 @@ Opções:
   -f, --field <slug>     campo (padrão: ${DEFAULTS.field})
   -l, --list             lista os horários disponíveis na data e sai
   -c, --concat           além dos individuais, gera também um vídeo com todos
+  -s, --swap             inverte a ordem das câmeras (câmera 2 | câmera 1)
   -o, --out-dir <dir>    diretório de saída (padrão: ${DEFAULTS.outDir})
       --downloads <dir>  diretório dos brutos (padrão: ${DEFAULTS.downloadsDir})
   -j, --concurrency <n>  downloads em paralelo (padrão: ${DEFAULTS.concurrency})
@@ -65,6 +67,7 @@ Exemplos:
   bun run index.ts 2026-07-29 20:30
   bun run index.ts 2026-07-29 20:30 --concat
   bun run index.ts 2026-07-29 22:30 --field global-society
+  bun run index.ts 2026-07-29 20:30 --field four-play-2 --swap
 `.trim();
 
 function fail(message: string): never {
@@ -82,6 +85,7 @@ function parseCliArgs(argv: string[]): CliArgs {
       field: { type: "string", short: "f" },
       list: { type: "boolean", short: "l" },
       concat: { type: "boolean", short: "c" },
+      swap: { type: "boolean", short: "s" },
       "out-dir": { type: "string", short: "o" },
       downloads: { type: "string" },
       concurrency: { type: "string", short: "j" },
@@ -96,6 +100,7 @@ function parseCliArgs(argv: string[]): CliArgs {
     help: values.help ?? false,
     list: values.list ?? false,
     concat: values.concat ?? false,
+    swap: values.swap ?? false,
     date: values.date ?? positionals[0],
     time: values.time ?? positionals[1],
     field: values.field ?? DEFAULTS.field,
@@ -215,8 +220,12 @@ async function main(): Promise<void> {
     const clock = pair.timestamp.slice(11).replaceAll(":", "-");
     const output = `${outSlotDir}/${index}_${clock}.mp4`;
 
+    // A numeração das câmeras nem sempre corresponde à ordem física em campo,
+    // então `--swap` troca os lados. Com uma câmera só, não muda nada.
+    const sources = args.swap ? [...pair.cameras].reverse() : pair.cameras;
+
     await renderClip({
-      sources: pair.cameras,
+      sources,
       output,
       cell,
       columns,
@@ -240,7 +249,12 @@ async function main(): Promise<void> {
     longest - shortest < 1
       ? `${longest.toFixed(1)}s cada`
       : `${shortest.toFixed(1)}–${longest.toFixed(1)}s cada`;
-  const layout = columns === 2 ? "câmera 1 | câmera 2" : "câmera 1";
+  const layout =
+    columns === 2
+      ? args.swap
+        ? "câmera 2 | câmera 1"
+        : "câmera 1 | câmera 2"
+      : "câmera 1";
 
   console.log(`\n✓ ${clips.length} vídeo(s) em ${outSlotDir}/`);
   console.log(`  ${frameWidth}x${cell.height} · ${each} · ${layout}`);

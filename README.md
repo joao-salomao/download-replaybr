@@ -49,6 +49,7 @@ bun run index.ts 2026-07-29 20:30 --concat
 | `-f, --field <slug>` | `placar-society` | Campo (o `fieldName` da URL do site) |
 | `-l, --list` | — | Lista os horários da data e sai |
 | `-c, --concat` | — | Gera também um `completo.mp4` com todos os lances |
+| `-s, --swap` | — | Inverte os lados das câmeras (`câmera 2 \| câmera 1`) |
 | `-o, --out-dir <dir>` | `output` | Diretório de saída |
 | `--downloads <dir>` | `downloads` | Diretório dos arquivos brutos |
 | `-j, --concurrency <n>` | `4` | Downloads em paralelo |
@@ -78,6 +79,16 @@ O horário aceita `20:30`, `2030` ou `20h30`.
 Assim todos os clipes de um horário mantêm as mesmas dimensões, e o `--concat` sem recodificar continua válido.
 
 A duração também varia por campo: `placar-society` grava ~30s por lance, enquanto `four-play-1` grava ~3s. O resumo ao final mede a duração real em vez de assumir.
+
+### Ordem das câmeras
+
+Por padrão a `camera1` fica à esquerda e a `camera2` à direita. A numeração da API, porém, não descreve a posição física das câmeras em campo — nos vídeos do Four Play os lados saem trocados em relação ao que se espera. Use `--swap` para inverter:
+
+```bash
+bun run index.ts 2026-07-29 20:30 --field four-play-2 --swap
+```
+
+A troca acontece na renderização (os brutos continuam nomeados pela numeração da API), e lances de câmera única não são afetados.
 
 ### Estrutura de saída (gerada)
 
